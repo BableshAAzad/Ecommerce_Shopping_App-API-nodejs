@@ -126,7 +126,8 @@ class UserController {
                                 username: username,
                                 email: email,
                                 termAndCondition: user.termAndCondition,
-                                userRole: user.userRole                            }
+                                userRole: user.userRole
+                            }
                         })
                     } catch (error) {
                         console.log(error)
@@ -158,6 +159,10 @@ class UserController {
             temp++
         }
         return username
+    }
+    // ^---------------------------------------------------------------------------------------------------------
+    static userLogin = async (req, res, next) => {
+
     }
 }
 

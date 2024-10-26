@@ -20,6 +20,9 @@ router.post('/sellers/register', addRollSeller, UserController.userRegistration)
 router.post('/customers/register', addRollCustomer, UserController.userRegistration)
 router.post("/users/otp-verification", UserController.userRegistrationWithOtp)
 
+router.post("/login", UserController.userLogin)
+
+
 //& Protected Routes
 
 
