@@ -100,27 +100,11 @@ class UserController {
                         await doc.save()
                         const saved_user = await UserModel.findOne({ email: email }).select("-password")
 
-                        //^ Generate JWT Token
-                        const refreshToken = jwt.sign({ userID: saved_user._id }, process.env.JWT_SECRET_KEY, { expiresIn: '15d' })
-                        res.cookie('rt', refreshToken, {
-                            httpOnly: true,   // This flag makes the cookie inaccessible to JavaScript
-                            secure: process.env.NODE_ENV === 'production' || "dev", // Secure flag for HTTPS in production
-                            sameSite: 'strict',  // Helps prevent CSRF attacks or `Lax`
-                            maxAge: 15 * 24 * 60 * 60 * 1000 // Token expires in 15 days
-                        })
-                        const accessToken = jwt.sign({ userID: saved_user._id }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })
-                        res.cookie('at', accessToken, {
-                            httpOnly: true,   // This flag makes the cookie inaccessible to JavaScript
-                            secure: process.env.NODE_ENV === 'production' || "dev", // Secure flag for HTTPS in production
-                            sameSite: 'strict',  // Helps prevent CSRF attacks or `Lax`
-                            maxAge: 60 * 60 * 1000 // Token expires in 1 hours
-                        })
-
                         // remove otp and mail to cache
                         cache_user.del(`user_${email}`)
                         cache_otp.del(`otp_${email}`)
 
-                        res.status(202).send({
+                        res.status(201).send({
                             "status": 201, "message": "Seller registration done", "data": {
                                 userId: saved_user._id,
                                 username: username,
@@ -162,8 +146,63 @@ class UserController {
     }
     // ^---------------------------------------------------------------------------------------------------------
     static userLogin = async (req, res, next) => {
-
+        let { username, password } = req.body
+        if (username && password) {
+            let user = await UserModel.findOne({ username })
+            if (user) {
+                const isMatch = await bcrypt.compare(password, user.password);
+                if (isMatch) {
+                    try {
+                        //^ Generate JWT Token
+                        const refreshToken = jwt.sign({ userId: user._id, userRole: user.userRole }, process.env.JWT_SECRET_KEY, { expiresIn: '15d' })
+                        res.cookie('rt', refreshToken, {
+                            httpOnly: true,   // This flag makes the cookie inaccessible to JavaScript
+                            secure: process.env.NODE_ENV === 'production' || "dev", // Secure flag for HTTPS in production
+                            sameSite: 'strict',  // Helps prevent CSRF attacks or `Lax`
+                            maxAge: 15 * 24 * 60 * 60 * 1000 // Token expires in 15 days
+                        })
+                        const accessToken = jwt.sign({ userId: user._id, userRole: user.userRole }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })
+                        res.cookie('at', accessToken, {
+                            httpOnly: true,   // This flag makes the cookie inaccessible to JavaScript
+                            secure: process.env.NODE_ENV === 'production' || "dev", // Secure flag for HTTPS in production
+                            sameSite: 'strict',  // Helps prevent CSRF attacks or `Lax`
+                            maxAge: 60 * 60 * 1000 // Token expires in 1 hours
+                        })
+                        res.status(200).send({
+                            "status": 200, "message": "Login successfully done", "data": {
+                                userId: user._id,
+                                username: user.username,
+                                userRole: user.userRole,
+                                accessExpiration: 60 * 60,
+                                refreshExpiration: 15 * 24 * 60 * 60
+                            }
+                        })
+                    } catch (error) {
+                        console.log(error)
+                        res.status(500).send({ "status": 500, "message": "Unable to login", "rootCause": "Please fill correct information" })
+                        // ! 500 Internal Server Error for server errors during registration.
+                    }
+                } else {
+                    res.status(400).send({ "status": 400, "message": "Login failed", "rootCause": "User not validate" })
+                    //! 400 Bad Request for missing fields or password mismatch. 
+                }
+            } else {
+                res.status(400).send({ "status": 400, "message": "Login failed", "rootCause": "User not validate" })
+                //! 400 Bad Request for missing fields or password mismatch.  
+            }
+        } else {
+            res.status(400).send({ "status": 400, "message": "All fields are required", "rootCause": "Please fill all fields properly..." })
+            //! 400 Bad Request for missing fields or password mismatch.
+        }
     }
+    // ^---------------------------------------------------------------------------------------------------------
+
+    static loggedUser = async (req, res) => {
+        res.status(200).send({ "status": 200, "message": "User founded", "data": req.user })
+    }
+
+    // ^---------------------------------------------------------------------------------------------------------
+
 }
 
 export default UserController
