@@ -4,6 +4,7 @@ import cors from "cors"
 import connectDB from "./config/connectdb.js"
 import userRoutes from './routes/userRoutes.js'
 // const userRoutes = require("./routes/userRoutes.js")
+import productRoutes from "./routes/productRoutes.js"
 import bodyParser from 'body-parser';
 
 //! invoke dotenv
@@ -41,8 +42,10 @@ app.use((err, req, res, next) => {
     next();
 });
 
+
 //~ Load Routes
 app.use("/api/v1", userRoutes)
+app.use("/api/v1", productRoutes)
 
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`)
