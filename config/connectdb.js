@@ -2,11 +2,7 @@ import mongoose from "mongoose";
 
 const connectDB = async (DATABASE_URL, DATABASE_NAME) => {
     try {
-        const DB_OPTIONS = {
-            dbName: DATABASE_NAME,
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        };
+        const DB_OPTIONS = {dbName: DATABASE_NAME};
         await mongoose.connect(DATABASE_URL, DB_OPTIONS);
         console.log('Connected to MongoDB successfully.');
     } catch (error) {

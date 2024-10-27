@@ -17,6 +17,8 @@ const storage = new CloudinaryStorage({
 
 router.post("/upload-images", upload.single('image'), ProductController.uploadImage)
 router.post("/products",upload.single('productImage'),  ProductController.addProduct)
+router.get("/products",  ProductController.getProducts)
+router.get("/sellers/:userId/products", ProductController.getProductsBySeller)
 
 export default router
 
