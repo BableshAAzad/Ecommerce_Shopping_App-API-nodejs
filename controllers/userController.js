@@ -198,6 +198,8 @@ class UserController {
     // ^---------------------------------------------------------------------------------------------------------
 
     static loggedUser = async (req, res) => {
+        console.log("-------------------------------")
+        console.log(req.user)
         res.status(200).send({ "status": 200, "message": "User founded", "data": req.user })
     }
 

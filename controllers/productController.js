@@ -40,10 +40,10 @@ class ProductController {
                 weightInKg,
                 price,
                 description,
-                productImage,
                 materialTypes,
                 discountType,
-                discount } = req.body
+                discount,
+                stocks } = req.body
             // & save image
             const result = await cloudinary.v2.uploader.upload(req.file.path, {
                 folder: 'ecommerce-shopping-app',
@@ -60,7 +60,9 @@ class ProductController {
                 productImage: result.secure_url,
                 materialTypes: materialTypes,
                 discountType: discountType,
-                discount: discount
+                discount: discount,
+                stocks: stocks,
+                restockedAt: new Date().setHours(0, 0, 0, 0)
             })
             await product.save();
             resp.status(201).send({ "status": 201, "message": "Product added", "data": "product added successfully" })
@@ -70,7 +72,25 @@ class ProductController {
         }
     }
     // ^---------------------------------------------------------------------------------------------------------
+    static getProducts = async (req, resp) => {
+        // Default to page 0 and size 10 if not provided
+        const page = parseInt(req.query.page) || 0;
+        const size = parseInt(req.query.size) || 10;
 
+        const totalItems = await ProductModel.countDocuments(); // Get total item count
+        const products = await ProductModel.find()
+            .skip(page * size)
+            .limit(size);
+        const data = {
+            content: products,
+            page: {
+                totalElements: totalItems,
+                totalPages: Math.ceil(totalItems / size),
+                currentPage: page,
+            }
+        };
+        resp.status(200).send({ status: 200, "message": "Products are founded", data })
+    }
 }
 
 export default ProductController
