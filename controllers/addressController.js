@@ -38,7 +38,7 @@ class AddressController {
             try {
                 let userId = req.user.userId.toString()
                 if (_id === userId) {
-                    let addresses = await AddressModel.find()
+                    let addresses = await AddressModel.find({ userId: _id })
                         .populate("contacts") // Populate contacts field
                         .exec();
 
