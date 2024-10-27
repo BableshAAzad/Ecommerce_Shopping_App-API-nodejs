@@ -6,6 +6,8 @@ import userRoutes from './routes/userRoutes.js'
 // const userRoutes = require("./routes/userRoutes.js")
 import productRoutes from "./routes/productRoutes.js"
 import bodyParser from 'body-parser';
+import addressRoutes from "./routes/addressRoutes.js"
+import contactRoutes from "./routes/contactRoutes.js"
 
 //! invoke dotenv
 dotenv.config();
@@ -42,10 +44,11 @@ app.use((err, req, res, next) => {
     next();
 });
 
-
 //~ Load Routes
 app.use("/api/v1", userRoutes)
 app.use("/api/v1", productRoutes)
+app.use("/api/v1", addressRoutes)
+app.use("/api/v1", contactRoutes)
 
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`)
