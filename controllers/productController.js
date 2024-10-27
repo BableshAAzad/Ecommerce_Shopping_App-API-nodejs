@@ -43,9 +43,13 @@ class ProductController {
                 discount,
                 stocks } = req.body
             // & save image
-            const result = await cloudinary.v2.uploader.upload(req.file.path, {
-                folder: 'ecommerce-shopping-app',
-            });
+            let productImageUrl = "";
+            if (req.file && req.file.path) {
+                const result = await cloudinary.v2.uploader.upload(req.file.path, {
+                    folder: 'ecommerce-shopping-app',
+                });
+                productImageUrl = result.secure_url; // Set image URL after upload
+            }
             let product = new ProductModel({
                 sellerId: sellerId,
                 productTitle: productTitle,
@@ -55,7 +59,7 @@ class ProductController {
                 weightInKg: weightInKg,
                 price: price,
                 description: description,
-                productImage: result.secure_url,
+                productImage: productImageUrl,
                 materialTypes: materialTypes,
                 discountType: discountType,
                 discount: discount,
@@ -115,12 +119,113 @@ class ProductController {
                 };
                 resp.status(200).send({ status: 200, message: "Products found for seller", data });
             } catch (error) {
+                console.log(error)
                 resp.status(500).send({ status: 500, message: "Error fetching products", error: error.message });
             }
         } else {
-            resp.status(500).send({ status: 500, message: "Illegal Operation" });
+            resp.status(500).send({ status: 500, message: "Illegal Operation: Missing Seller ID" });
         }
     }
+    // ^---------------------------------------------------------------------------------------------------------
+    static getProduct = async (req, resp) => {
+        const _id = req.params.productId;
+        if (_id) {
+            try {
+                // Fetch the product by its ID directly
+                let product = await ProductModel.findById(_id);
+                if (product) {
+                    resp.status(200).send({ status: 200, message: "Product found", data: product });
+                } else {
+                    resp.status(404).send({ status: 404, message: "Product not found" });
+                }
+            } catch (error) {
+                console.error(error);
+                resp.status(500).send({ status: 500, message: "Error fetching product", error: error.message });
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "Illegal Operation: Missing product ID" });
+        }
+    }
+    // ^---------------------------------------------------------------------------------------------------------
+    static updateProduct = async (req, resp) => {
+        const _id = req.params.productId;
+        if (_id) {
+            try {
+                // Fetch the product by its ID directly
+                let product = await ProductModel.findById(_id);
+                if (product) {
+                    // Update product fields with the request body, skipping undefined fields
+                    Object.keys(req.body).forEach(key => {
+                        if (key !== "productImage" && req.body[key] !== undefined) { // Avoid undefined values
+                            product[key] = req.body[key];
+                        }
+                    });
+                    // Check if a new image file is uploaded
+                    if (req.file && req.file.path !== product.productImage) {
+                        // Upload the new image to Cloudinary
+                        const result = await cloudinary.v2.uploader.upload(req.file.path, {
+                            folder: 'ecommerce-shopping-app',
+                        });
+                        product.productImage = result.secure_url; // Update productImage with new URL
+                    }
+                    product.updatedInventoryAt = new Date().toISOString().split('T')[0]
+                    // Save the updated product back to the database
+                    await product.save();
+                    resp.status(200).send({ status: 200, message: "Product updated successfully", product });
+                } else {
+                    resp.status(404).send({ status: 404, message: "Product not found" });
+                }
+            } catch (error) {
+                console.error(error);
+                resp.status(500).send({ status: 500, message: "Error updating product", error: error.message });
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "Illegal Operation: Missing product ID" });
+        }
+    };
+    // ^---------------------------------------------------------------------------------------------------------
+    static searchProducts = async (req, resp) => {
+        const query = req.params.query;
+        if (query) {
+            try {
+                // Default to page 0 and size 10 if not provided in query
+                const page = parseInt(req.query.page) || 0;
+                const size = parseInt(req.query.size) || 10;
+                // Construct a dynamic search condition to look for products that match the query
+                const searchCondition = {
+                    $or: [
+                        { productTitle: { $regex: query, $options: "i" } },   // Case-insensitive search on product title
+                        { description: { $regex: query, $options: "i" } },    // Case-insensitive search on description
+                        { materialTypes: { $regex: query, $options: "i" } },  // Case-insensitive search in material types
+                        { discountType: { $regex: query, $options: "i" } }    // Case-insensitive search in discount type
+                    ],
+                    // Handle exact matches for price if the query can be converted to a number
+                    ...(parseFloat(query) ? { price: parseFloat(query) } : {})
+                };
+                // Find products matching the search condition with pagination
+                const products = await ProductModel.find(searchCondition)
+                    .skip(page * size)   // Skip items based on the current page
+                    .limit(size);        // Limit results to the page size
+                // Count total documents that match the query for pagination metadata
+                const totalResults = await ProductModel.countDocuments(searchCondition);
+                // Send response with products and pagination info
+                const data = {
+                    content: products,
+                    page: {
+                        totalElements: totalResults,
+                        totalPages: Math.ceil(totalResults / size),
+                        currentPage: page,
+                    }
+                };
+                resp.status(200).send({ status: 200, message: "Products fetched successfully", data });
+            } catch (error) {
+                console.error(error);
+                resp.status(500).send({ status: 500, message: "Error fetching products", rootCause: error.message });
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "Illegal Operation: Missing product search query" });
+        }
+    };
 
 }
 
