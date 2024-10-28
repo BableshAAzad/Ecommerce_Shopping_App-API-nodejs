@@ -9,6 +9,7 @@ import bodyParser from 'body-parser';
 import addressRoutes from "./routes/addressRoutes.js"
 import contactRoutes from "./routes/contactRoutes.js"
 import cartRoutes from "./routes/cartRoutes.js"
+import orderRoutes from "./routes/orderRoutes.js"
 
 //! invoke dotenv
 dotenv.config();
@@ -51,6 +52,7 @@ app.use("/api/v1", productRoutes)
 app.use("/api/v1", addressRoutes)
 app.use("/api/v1", contactRoutes)
 app.use("/api/v1", cartRoutes)
+app.use("/api/v1", orderRoutes)
 
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`)
