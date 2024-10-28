@@ -9,7 +9,6 @@ class CartController {
             try {
                 const authUserId = req.user.userId.toString();
                 if (userId === authUserId) {
-                    // Destructure and validate required fields from req.body
                     const { selectedQuantity, product } = req.body;
 
                     if (!selectedQuantity || !product || !product.productId) {
@@ -18,15 +17,76 @@ class CartController {
                             message: "Invalid data: selectedQuantity and product.productId are required",
                         });
                     }
-                    // Create a new cart item
-                    const cartItem = new CartModel({
-                        userId,
-                        selectedQuantity,
-                        product: product.productId // only store the productId as a reference
-                    });
-                    // Save the cart item
-                    await cartItem.save();
-                    resp.status(201).send({ status: 201, message: "Product added to cart successfully", data: cartItem, });
+
+                    // Check if the product already exists in the user's cart
+                    const existingCartItem = await CartModel.findOne({ userId, product: product.productId });
+
+                    // Fetch the associated product to check available stocks
+                    const productItem = await ProductModel.findById(product.productId);
+                    if (!productItem) {
+                        return resp.status(400).send({
+                            status: 400,
+                            message: "Invalid data: Product not found",
+                        });
+                    }
+
+                    if (existingCartItem) {
+                        // Calculate the difference in quantity
+                        const previousQuantity = existingCartItem.selectedQuantity;
+                        const quantityDifference = selectedQuantity - previousQuantity;
+
+                        // Check if the stock is sufficient for the updated quantity
+                        if (productItem.stocks < quantityDifference) {
+                            return resp.status(400).send({
+                                status: 400,
+                                message: "Invalid data: selected quantity exceeds available stocks",
+                            });
+                        }
+
+                        // Update the cart item with new quantity
+                        existingCartItem.selectedQuantity = selectedQuantity;
+                        await existingCartItem.save();
+
+                        // Adjust the product stocks based on quantity difference
+                        await ProductModel.findByIdAndUpdate(
+                            product.productId,
+                            { $inc: { stocks: -quantityDifference } }
+                        );
+
+                        return resp.status(200).send({
+                            status: 200,
+                            message: "Cart product quantity updated successfully",
+                            data: existingCartItem,
+                        });
+                    } else {
+                        // Check if there's enough stock for a new cart item
+                        if (productItem.stocks < selectedQuantity) {
+                            return resp.status(400).send({
+                                status: 400,
+                                message: "Invalid data: selected quantity exceeds available stocks",
+                            });
+                        }
+
+                        // Create a new cart item
+                        const cartItem = new CartModel({
+                            userId,
+                            selectedQuantity,
+                            product: product.productId,
+                        });
+
+                        // Save the new cart item and update product stock
+                        await cartItem.save();
+                        await ProductModel.findByIdAndUpdate(
+                            product.productId,
+                            { $inc: { stocks: -selectedQuantity } }
+                        );
+
+                        resp.status(201).send({
+                            status: 201,
+                            message: "Product added to cart successfully",
+                            data: cartItem,
+                        });
+                    }
                 } else {
                     resp.status(400).send({ status: 400, message: "Illegal Operation: User ID Mismatch" });
                 }
@@ -37,7 +97,8 @@ class CartController {
         } else {
             resp.status(400).send({ status: 400, message: "Illegal Operation: Missing User ID" });
         }
-    }
+    };
+
     // ^---------------------------------------------------------------------------------------------------------
     static getCartProducts = async (req, resp) => {
         const userId = req.params.userId;
@@ -144,10 +205,114 @@ class CartController {
             });
         }
     };
+    // ^---------------------------------------------------------------------------------------------------------
 
+    static deleteCartProduct = async (req, resp) => {
+        const userId = req.params.userId;
+        const cartProductId = req.params.cartProductId;
+
+        if (!userId || !cartProductId) {
+            return resp.status(400).send({
+                status: 400,
+                message: "Invalid Operation: Missing User ID or Cart Product ID",
+            });
+        }
+
+        try {
+            const authUserId = req.user.userId.toString();
+            if (userId !== authUserId) {
+                return resp.status(400).send({ status: 400, message: "Illegal Operation: User ID Mismatch" });
+            }
+
+            // Find the cart item to delete
+            const cartItem = await CartModel.findOne({ _id: cartProductId, userId });
+            if (!cartItem) {
+                return resp.status(404).send({
+                    status: 404,
+                    message: "Cart product not found",
+                });
+            }
+
+            // Find the associated product to update its stock
+            const product = await ProductModel.findById(cartItem.product._id);
+            if (!product) {
+                return resp.status(400).send({
+                    status: 400,
+                    message: "Invalid data: Product not found",
+                });
+            }
+
+            // Restore the product stock based on the cart item quantity
+            await ProductModel.findByIdAndUpdate(
+                cartItem.product,
+                { $inc: { stocks: cartItem.selectedQuantity } }
+            );
+
+            // Delete the cart item
+            await CartModel.deleteOne({ _id: cartProductId });
+
+            resp.status(200).send({
+                status: 200,
+                message: "Cart product deleted successfully and stock updated",
+            });
+        } catch (error) {
+            console.error(error);
+            resp.status(500).send({
+                status: 500,
+                message: "Error: Failed to delete cart product",
+                rootCause: error.message,
+            });
+        }
+    };
+    // ^---------------------------------------------------------------------------------------------------------
+    static deleteAllCartProduct = async (req, resp) => {
+        const userId = req.params.userId;
+
+        if (!userId) {
+            return resp.status(400).send({ status: 400, message: "Illegal Operation: Missing User ID" });
+        }
+
+        try {
+            const authUserId = req.user.userId.toString();
+            if (userId !== authUserId) {
+                return resp.status(400).send({ status: 400, message: "Illegal Operation: User ID Mismatch" });
+            }
+
+            // Retrieve all cart items for the user
+            const cartItems = await CartModel.find({ userId });
+            if (!cartItems.length) {
+                return resp.status(404).send({ status: 404, message: "No cart products found for the user" });
+            }
+
+            // Update stock for each product in the cart
+            const bulkProductUpdates = cartItems.map(cartItem => ({
+                updateOne: {
+                    filter: { _id: cartItem.product },
+                    update: { $inc: { stocks: cartItem.selectedQuantity } }
+                }
+            }));
+
+            // Execute bulk update for stock adjustments
+            await ProductModel.bulkWrite(bulkProductUpdates);
+
+            // Delete all cart items for the user
+            await CartModel.deleteMany({ userId });
+
+            resp.status(200).send({
+                status: 200,
+                message: "All cart products deleted successfully, and stocks updated",
+            });
+        } catch (error) {
+            console.error(error);
+            resp.status(500).send({
+                status: 500,
+                message: "Error: Failed to delete all cart products",
+                rootCause: error.message,
+            });
+        }
+    };
 
     // ^---------------------------------------------------------------------------------------------------------
 
 }
-
 export default CartController
