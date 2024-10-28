@@ -1,14 +1,6 @@
 import ProductModel from "../models/product.js"
 import cloudinary from 'cloudinary';
 
-//! Configure Cloudinary with credentials
-cloudinary.v2.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    // secure: true,
-});
-
 class ProductController {
     // ^---------------------------------------------------------------------------------------------------------
     static uploadImage = async (req, res) => {
@@ -42,6 +34,7 @@ class ProductController {
                 discountType,
                 discount,
                 stocks } = req.body
+
             // & save image
             let productImageUrl = "";
             if (req.file && req.file.path) {
@@ -50,6 +43,7 @@ class ProductController {
                 });
                 productImageUrl = result.secure_url; // Set image URL after upload
             }
+
             let product = new ProductModel({
                 sellerId: sellerId,
                 productTitle: productTitle,
@@ -226,6 +220,77 @@ class ProductController {
             resp.status(400).send({ status: 400, message: "Illegal Operation: Missing product search query" });
         }
     };
+    // ^---------------------------------------------------------------------------------------------------------
+
+    static filterProducts = async (req, resp) => {
+        // Default to page 0 and size 10 if not provided
+        const page = parseInt(req.query.page) || 0;
+        const size = parseInt(req.query.size) || 10;
+    
+        let { productTitle, minPrice, maxPrice, description, sortOrder, materialTypes } = req.body;
+        //! console.log(req.body)
+    
+        // Initialize filter criteria
+        const filterCriteria = {};
+    
+        // Build filter criteria based on the provided inputs
+        if (productTitle) {
+            filterCriteria.productTitle = { $regex: new RegExp(productTitle, 'i') }; // Case-insensitive search
+        }
+    
+        // Convert minPrice and maxPrice to numbers and check for valid values
+        if (minPrice !== undefined && minPrice !== '') {
+            const min = parseFloat(minPrice);
+            if (!isNaN(min)) {
+                filterCriteria.price = { ...filterCriteria.price, $gte: min };
+            }
+        }
+    
+        if (maxPrice !== undefined && maxPrice !== '') {
+            const max = parseFloat(maxPrice);
+            if (!isNaN(max)) {
+                filterCriteria.price = { ...filterCriteria.price, $lte: max };
+            }
+        }
+    
+        if (description) {
+            filterCriteria.description = { $regex: new RegExp(description, 'i') }; // Case-insensitive search
+        }
+    
+        if (Array.isArray(materialTypes) && materialTypes.length > 0) {
+            filterCriteria.materialTypes = { $in: materialTypes }; // Filter for material types
+        }
+    
+        //! console.log("Filter Criteria:", filterCriteria); // Debugging line
+    
+        try {
+            // Get total items count based on the filter criteria
+            const totalItems = await ProductModel.countDocuments(filterCriteria);
+            //! console.log("Total Items:", totalItems); // Debugging line
+    
+            // Fetch products with pagination and filtering
+            const products = await ProductModel.find(filterCriteria)
+                .skip(page * size)
+                .limit(size)
+                .sort(sortOrder ? { price: sortOrder === 'asc' ? 1 : -1 } : {});
+    
+            const data = {
+                content: products,
+                page: {
+                    totalElements: totalItems,
+                    totalPages: Math.ceil(totalItems / size),
+                    currentPage: page,
+                }
+            };
+    
+            resp.status(200).send({ status: 200, message: "Products found", data });
+        } catch (error) {
+            console.error(error);
+            resp.status(500).send({ status: 500, message: "Error filtering products", rootCause: error.message });
+        }
+    };
+    // ^---------------------------------------------------------------------------------------------------------
+
 
 }
 
