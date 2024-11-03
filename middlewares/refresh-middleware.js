@@ -11,6 +11,7 @@ let refreshLogin = async (req, res) => {
         if (authorization) {
             const cookies = cookie.parse(authorization);
             refreshToken = cookies.rt;  // Extract refresh token (`rt`) from parsed cookies
+            console.log("-------------------Refresh Token Generated---------------------")
             console.log(`Refresh token: ${refreshToken}`);
         }
 

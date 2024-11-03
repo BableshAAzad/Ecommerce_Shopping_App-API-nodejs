@@ -6,7 +6,10 @@ import transporter from '../config/emailConfig.js'
 
 // Create a cache instance with a default TTL of 15 minutes (900 seconds)
 const cache_user = new NodeCache({ stdTTL: 900 });
+// Create a cache instance with a default TTL of 5 minutes (300 seconds)
 const cache_otp = new NodeCache({ stdTTL: 300 })
+// Create a cache instance with a default TTL of 17ugyfv6a  w#5678UY    `15 minutes (300 seconds)
+const secrete_otp = new NodeCache({ stdTTL: 900 })
 
 class UserController {
     // ^---------------------------------------------------------------------------------------------------------
@@ -99,6 +102,13 @@ class UserController {
                         })
                         await doc.save()
                         const saved_user = await UserModel.findOne({ email: email }).select("-password")
+
+                        await transporter.sendMail({
+                            from: process.env.EMAIL_FROM,
+                            to: user.email,
+                            subject: "Registration successfully done - Ecommerce-Shopping-App",
+                            html: `<h2>Your username is : ${username} </h2></br><p>Thanks for registration 😄🙏🙏🙏</p>`
+                        })
 
                         // remove otp and mail to cache
                         cache_user.del(`user_${email}`)
@@ -201,8 +211,79 @@ class UserController {
         // console.log(req.user)
         res.status(200).send({ "status": 200, "message": "User founded", "data": req.user })
     }
+    // ^---------------------------------------------------------------------------------------------------------
+    static resendOtp = async (req, resp) => {
+        let { email } = req.body
+        if (email) {
+            const user = cache_user.get(`user_${email}`);
+            if (user) {
+                // Generate new otp
+                let otp = Math.floor(100000 + Math.random() * 900000);
+                // Store user and OTP in cache with separate keys
+                const expirationTime = new Date(Date.now() + 5 * 60 * 1000);
+                const time = expirationTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // ^------------------------s---------------------------------------------------------------------------------
+                // ~ Set new otp
+                cache_otp.set(`otp_${email}`, otp);
+
+                // send mail with opt
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM,
+                    to: user.email,
+                    subject: "OTP - Ecommerce-Shopping-App",
+                    html: `<h2>Your new otp is : ${otp} </h2></br><p>Otp will be expired after 5 minutes: ${time}</p>`
+                })
+                resp.status(202).send({
+                    "status": 202, "message": "Otp re-sended", "data": {
+                        userId: null,
+                        username: null,
+                        email: email,
+                        termAndCondition: user.termAndCondition,
+                        userRole: user.userRole
+                    }
+                })
+            } else {
+                resp.status(500).send({ status: 500, message: "Registration failed : Season expired", rootCause: "Please try again" })
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "All fields are required", rootCause: "Registration failed" })
+        }
+    }
+    // ^---------------------------------------------------------------------------------------------------------
+    static forgetPassword = async (req, resp) => {
+        let { email } = req.params
+        if (email) {
+            let user = await UserModel.findOne({ email : email })
+            if (user) {
+                  // Generate otp
+                  let otp = Math.floor(100000 + Math.random() * 900000);
+                  let secrete = Math.floor(100000 + Math.random() * 900000);
+                  // Store user and OTP in cache with separate keys
+                  const expirationTime = new Date(Date.now() + 5 * 60 * 1000);
+                  const time = expirationTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+                  // ~ Set new otp
+                  cache_otp.set(`otp_${email}`, otp);
+                  secrete_otp.set(`secrete_${email}`, secrete)
+                  // send mail with opt
+                  await transporter.sendMail({
+                      from: process.env.EMAIL_FROM,
+                      to: user.email,
+                      subject: "OTP - Ecommerce-Shopping-App",
+                      html: `<h2>Your password reset otp is : ${otp} </h2>
+                      </br>
+                      <h2>Your Secrete key is : ${secrete} </h2>
+                      <p>Otp will be expired after 5 minutes: ${time}</p>`
+                  })
+                resp.status(200).send({ "status": 200, "message": "Otp sended", "data": "Check your mail id" })
+            } else {
+                resp.status(400).send({ status: 400, message: "Invalid Email", rootCause: "Password reset failed" })
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "All fields are required", rootCause: "Password reset failed" })
+        }
+    }
+    // ^---------------------------------------------------------------------------------------------------------
 
 }
 

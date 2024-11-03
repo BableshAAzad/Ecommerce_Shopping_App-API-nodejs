@@ -7,10 +7,14 @@ import logout from '../middlewares/logout-middleware.js';
 import refreshLogin from "../middlewares/refresh-middleware.js"
 
 //& Route Level Middleware - To Protect Route
-router.use('/users/:userId', checkUserAuth)
+router.get('/users/:userId', checkUserAuth)
 router.use("/logout", logout)
 
-//& Public Routes
+//& Protected Routes
+router.get('/users/:userId', UserController.loggedUser)
+router.post("/refresh-login", refreshLogin)
+
+//* Public Routes
 // Custom middleware to add data to req object
 const addRollSeller = (req, res, next) => {
     req.addRoll = "SELLER";
@@ -24,10 +28,8 @@ router.post('/sellers/register', addRollSeller, UserController.userRegistration)
 router.post('/customers/register', addRollCustomer, UserController.userRegistration)
 router.post("/users/otp-verification", UserController.userRegistrationWithOtp)
 router.post("/login", UserController.userLogin)
-
-//& Protected Routes
-router.get('/users/:userId', UserController.loggedUser)
-router.post("/refresh-login",refreshLogin)
+router.post("/users/resend-otp", UserController.resendOtp)
+router.put("/users/update/:email", UserController.forgetPassword)
 
 export default router
 
