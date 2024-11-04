@@ -29,7 +29,8 @@ router.post('/customers/register', addRollCustomer, UserController.userRegistrat
 router.post("/users/otp-verification", UserController.userRegistrationWithOtp)
 router.post("/login", UserController.userLogin)
 router.post("/users/resend-otp", UserController.resendOtp)
-router.put("/users/update/:email", UserController.forgetPassword)
+router.put("/users/reset-password", UserController.sendUserPasswordResetEmail)
+router.put('/users/reset-password/:id/:token', UserController.userPasswordReset)
 
 export default router
 
