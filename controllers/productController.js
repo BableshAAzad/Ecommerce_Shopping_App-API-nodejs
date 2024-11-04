@@ -1,5 +1,6 @@
 import ProductModel from "../models/product.js"
 import cloudinary from 'cloudinary';
+import mongoose from "mongoose"
 
 class ProductController {
     // ^---------------------------------------------------------------------------------------------------------
@@ -226,18 +227,18 @@ class ProductController {
         // Default to page 0 and size 10 if not provided
         const page = parseInt(req.query.page) || 0;
         const size = parseInt(req.query.size) || 10;
-    
+
         let { productTitle, minPrice, maxPrice, description, sortOrder, materialTypes } = req.body;
         //! console.log(req.body)
-    
+
         // Initialize filter criteria
         const filterCriteria = {};
-    
+
         // Build filter criteria based on the provided inputs
         if (productTitle) {
             filterCriteria.productTitle = { $regex: new RegExp(productTitle, 'i') }; // Case-insensitive search
         }
-    
+
         // Convert minPrice and maxPrice to numbers and check for valid values
         if (minPrice !== undefined && minPrice !== '') {
             const min = parseFloat(minPrice);
@@ -245,35 +246,35 @@ class ProductController {
                 filterCriteria.price = { ...filterCriteria.price, $gte: min };
             }
         }
-    
+
         if (maxPrice !== undefined && maxPrice !== '') {
             const max = parseFloat(maxPrice);
             if (!isNaN(max)) {
                 filterCriteria.price = { ...filterCriteria.price, $lte: max };
             }
         }
-    
+
         if (description) {
             filterCriteria.description = { $regex: new RegExp(description, 'i') }; // Case-insensitive search
         }
-    
+
         if (Array.isArray(materialTypes) && materialTypes.length > 0) {
             filterCriteria.materialTypes = { $in: materialTypes }; // Filter for material types
         }
-    
+
         //! console.log("Filter Criteria:", filterCriteria); // Debugging line
-    
+
         try {
             // Get total items count based on the filter criteria
             const totalItems = await ProductModel.countDocuments(filterCriteria);
             //! console.log("Total Items:", totalItems); // Debugging line
-    
+
             // Fetch products with pagination and filtering
             const products = await ProductModel.find(filterCriteria)
                 .skip(page * size)
                 .limit(size)
                 .sort(sortOrder ? { price: sortOrder === 'asc' ? 1 : -1 } : {});
-    
+
             const data = {
                 content: products,
                 page: {
@@ -282,7 +283,7 @@ class ProductController {
                     currentPage: page,
                 }
             };
-    
+
             resp.status(200).send({ status: 200, message: "Products found", data });
         } catch (error) {
             console.error(error);
@@ -290,6 +291,66 @@ class ProductController {
         }
     };
     // ^---------------------------------------------------------------------------------------------------------
+    static productsDashboard = async (req, resp) => {
+        let sellerId = req.user.userId; // Assuming sellerId is available in req.user
+        try {
+            // Get sales/stocks over time (for line chart), filtered by sellerId
+            const lineData = await ProductModel.aggregate([
+                { $match: { sellerId: new mongoose.Types.ObjectId(sellerId) } }, // Filter by sellerId
+                { $group: { _id: { $month: "$restockedAt" }, totalStocks: { $sum: "$stocks" } } },
+                { $sort: { "_id": 1 } } // Sort by month
+            ]);
+
+            // Map lineData for frontend
+            const formattedLineData = lineData.map(item => item.totalStocks);
+
+            // Get product counts by category (for bar chart), filtered by sellerId
+            const barData = await ProductModel.aggregate([
+                { $match: { sellerId: new mongoose.Types.ObjectId(sellerId) } }, // Filter by sellerId
+                { $unwind: "$materialTypes" }, // Unwind materialTypes array for individual grouping
+                { $group: { _id: "$materialTypes", count: { $sum: 1 } } }
+            ]);
+
+            // Map barData for frontend with all material types
+            const allTypes = [
+                "SOLID", "LIQUID", "WOOD", "PLASTIC", "FIBER", "RUBBER",
+                "ELECTRONIC", "METAL", "GLASS", "CERAMIC", "FABRIC", "PAPER",
+                "LEATHER", "STONE", "COMPOSITE", "BIODEGRADABLE", "SYNTHETIC",
+                "ORGANIC", "CLOTH"
+            ];
+
+            const formattedBarData = allTypes.map(type => {
+                const match = barData.find(item => item._id === type);
+                return match ? match.count : 0; // Assign 0 if type is not found
+            });
+
+            // Get product distribution by discount types (for pie chart), filtered by sellerId
+            const pieData = await ProductModel.aggregate([
+                { $match: { sellerId: new mongoose.Types.ObjectId(sellerId) } }, // Filter by sellerId
+                { $group: { _id: "$discountType", count: { $sum: 1 } } }
+            ]);
+
+            // Map pieData for frontend
+            const formattedPieData = pieData.map(item => item.count);
+
+            // Send formatted data to frontend
+            console.log({
+                lineData: formattedLineData,
+                barData: formattedBarData,
+                pieData: formattedPieData,
+            })
+            resp.status(200).send({
+                lineData: formattedLineData,
+                barData: formattedBarData,
+                pieData: formattedPieData,
+            });
+        } catch (error) {
+            console.log(error);
+            resp.status(400).send({ status: 400, message: "Failed to fetch data", rootCause: "Please try again" });
+        }
+    };
+
+
 
 
 }
