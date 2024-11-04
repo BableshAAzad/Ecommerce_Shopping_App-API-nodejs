@@ -256,9 +256,7 @@ class UserController {
 
                 const secret = user._id + process.env.JWT_SECRET_KEY
                 const token = jwt.sign({ userID: user._id }, secret, { expiresIn: '5m' })
-                const link = `http://localhost:5173/reset-password/${user._id}/${token}`
-                console.log("----------password reset link-----------")
-                console.log(link)
+                const link = `http://localhost:5173/reset-password/${user._id}/${token}` //* with frontend url
 
                 const expirationTime = new Date(Date.now() + 5 * 60 * 1000);
                 const time = expirationTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -298,7 +296,7 @@ class UserController {
                         const salt = await bcrypt.genSalt(10)
                         const newHashPassword = await bcrypt.hash(password, salt)
                         await UserModel.findByIdAndUpdate(user._id, { $set: { password: newHashPassword } })
-                        res.status(200).send({ status: 200, message: "Password Reset Successfully", data: "Login with new password" })
+                        res.status(200).send({ status: 200, message: "Password Reset Successfully done.", data: "Login with new password" })
                     }
                 } else {
                     res.status(400).send({ status: 400, message: "All Fields are Required", rootCause : "Password Reset Failed" })
