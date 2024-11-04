@@ -29,6 +29,7 @@ const upload = multer({ storage });
 router.post("/products", checkUserAuth)
 router.get("/sellers/:userId/products", checkUserAuth)
 router.put("/sellers/products/:productId", checkUserAuth)
+router.get("/sellers/products/dashboard", checkUserAuth)
 
 //& Protected Routes
 router.post("/upload-images", upload.single('image'), ProductController.uploadImage)
@@ -39,7 +40,7 @@ router.get("/sellers/:userId/products", ProductController.getProductsBySeller)
 router.put("/sellers/products/:productId", upload.single('productImage'), ProductController.updateProduct)
 router.get("/products/search/:query", ProductController.searchProducts)
 router.post("/products/filter", ProductController.filterProducts)
-
+router.get("/sellers/products/dashboard", ProductController.productsDashboard)
 
 export default router
 
