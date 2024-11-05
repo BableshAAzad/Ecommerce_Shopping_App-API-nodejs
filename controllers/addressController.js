@@ -79,6 +79,22 @@ class AddressController {
         }
     }
     // ^---------------------------------------------------------------------------------------------------------
+    static getAddress = async (req, resp) => {
+        let { addressId } = req.params
+        if (addressId) {
+            let address = await AddressModel.findById({ _id: addressId })
+                .populate("contacts") // Populate contacts field
+                .exec();
+            if (address) {
+                resp.status(200).send({ status: 200, message: "Address founded", data: address });
+            } else {
+                resp.status(400).send({ status: 400, message: "Illegal Operation: Invalid address ID" });
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "Illegal Operation: Missing address ID" });
+        }
+    }
+    // ^---------------------------------------------------------------------------------------------------------
 
 }
 
