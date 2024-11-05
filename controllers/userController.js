@@ -17,7 +17,7 @@ class UserController {
 
         //& Check if user already exists
         if (user) {
-            res.status(409).send({ "status": "failed", "message": "Email already exists" })
+            res.status(409).send({ status: 409, message: "Email already exists", rootCause : "Please register with different mail id or reset password" })
             //! 409 Conflict for the case where the email already exists.
         } else {
             // ~ // Check if all fields are provided
