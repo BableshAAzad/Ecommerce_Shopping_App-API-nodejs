@@ -4,12 +4,13 @@ import ProductModel from "../models/product.js";
 import PDFDocument from 'pdfkit';
 import { Writable } from 'stream';
 import OrderInvoiceModel from "../models/orderInvoice.js"
+import CartModel from "../models/cart.js";
 
 class OrderController {
     // ^---------------------------------------------------------------------------------------------------------
     static addOrder = async (req, resp) => {
-
         let { userId, addressId, productId } = req.params
+
         if (!userId || !addressId || !productId)
             return resp.status(400).send({ status: 400, message: "Illegal Operation: Missing ID" });
 
@@ -49,6 +50,9 @@ class OrderController {
             productId,
             { $inc: { stocks: -totalQuantity } }
         );
+
+        //~ remove cart product after the user bye product 
+        await CartModel.findOneAndDelete({ product: product._id })
 
         // * create invoice in pdf formate
         const orderRequestDto = {
