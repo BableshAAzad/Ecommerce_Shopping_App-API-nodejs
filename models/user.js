@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, trim: true },
     password: { type: String, required: true, trim: true },
     termAndCondition: { type: Boolean, required: true },
-    userRole: { type: String, required: true, trim: true },
+    userRole: { type: String, enum: ["SELLER", "CUSTOMER"], required: true, trim: true },
     isDeleted: { type: Boolean, require: true }
 })
 

@@ -6,6 +6,7 @@ import transporter from '../config/emailConfig.js'
 
 // Create a cache instance with a default TTL of 15 minutes (900 seconds)
 const cache_user = new NodeCache({ stdTTL: 900 });
+// Create a cache instance with a default TTL of 5 minutes (300 seconds)
 const cache_otp = new NodeCache({ stdTTL: 300 })
 
 class UserController {
@@ -16,7 +17,7 @@ class UserController {
 
         //& Check if user already exists
         if (user) {
-            res.status(409).send({ "status": "failed", "message": "Email already exists" })
+            res.status(409).send({ status: 409, message: "Email already exists", rootCause : "Please register with different mail id or reset password" })
             //! 409 Conflict for the case where the email already exists.
         } else {
             // ~ // Check if all fields are provided
@@ -99,6 +100,13 @@ class UserController {
                         })
                         await doc.save()
                         const saved_user = await UserModel.findOne({ email: email }).select("-password")
+
+                        await transporter.sendMail({
+                            from: process.env.EMAIL_FROM,
+                            to: user.email,
+                            subject: "Registration successfully done - Ecommerce-Shopping-App",
+                            html: `<h2>Your username is : ${username} </h2></br><p>Thanks for registration 😄🙏🙏🙏</p>`
+                        })
 
                         // remove otp and mail to cache
                         cache_user.del(`user_${email}`)
@@ -198,10 +206,110 @@ class UserController {
     // ^---------------------------------------------------------------------------------------------------------
 
     static loggedUser = async (req, res) => {
+        // console.log(req.user)
         res.status(200).send({ "status": 200, "message": "User founded", "data": req.user })
     }
+    // ^---------------------------------------------------------------------------------------------------------
+    static resendOtp = async (req, resp) => {
+        let { email } = req.body
+        if (email) {
+            const user = cache_user.get(`user_${email}`);
+            if (user) {
+                // Generate new otp
+                let otp = Math.floor(100000 + Math.random() * 900000);
+                // Store user and OTP in cache with separate keys
+                const expirationTime = new Date(Date.now() + 5 * 60 * 1000);
+                const time = expirationTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // ^------------------------s---------------------------------------------------------------------------------
+                // ~ Set new otp
+                cache_otp.set(`otp_${email}`, otp);
+
+                // send mail with opt
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM,
+                    to: user.email,
+                    subject: "OTP - Ecommerce-Shopping-App",
+                    html: `<h2>Your new otp is : ${otp} </h2></br><p>Otp will be expired after 5 minutes: ${time}</p>`
+                })
+                resp.status(202).send({
+                    "status": 202, "message": "Otp re-sended", "data": {
+                        userId: null,
+                        username: null,
+                        email: email,
+                        termAndCondition: user.termAndCondition,
+                        userRole: user.userRole
+                    }
+                })
+            } else {
+                resp.status(500).send({ status: 500, message: "Registration failed : Season expired", rootCause: "Please try again" })
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "All fields are required", rootCause: "Registration failed" })
+        }
+    }
+    // ^---------------------------------------------------------------------------------------------------------
+    static sendUserPasswordResetEmail = async (req, resp) => {
+        let { email } = req.body
+        if (email) {
+            let user = await UserModel.findOne({ email: email })
+            if (user) {
+
+                const secret = user._id + process.env.JWT_SECRET_KEY
+                const token = jwt.sign({ userID: user._id }, secret, { expiresIn: '5m' })
+                const link = `http://localhost:5173/reset-password/${user._id}/${token}` //* with frontend url
+
+                const expirationTime = new Date(Date.now() + 5 * 60 * 1000);
+                const time = expirationTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                // send mail with opt
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM,
+                    to: user.email,
+                    subject: "Password Reset - Ecommerce-Shopping-App",
+                    html: `<h2>Click below link and set new password : 👇 </h2>
+                      </br>
+                      <p><a href=${link}>Click Here</a> to Reset Your Password</p>
+                      </br>
+                      <p>Link will be expire in ${time}</p>`
+                })
+                resp.status(200).send({ status: 200, message: "Password reset link sended", data: "Check your mail id" })
+            } else {
+                resp.status(400).send({ status: 400, message: "Invalid Email", rootCause: "User Not Exist" })
+            }
+        } else {
+            resp.status(400).send({ status: 400, message: "All fields are required", rootCause: "Password reset failed" })
+        }
+    }
+    // ^---------------------------------------------------------------------------------------------------------
+    static userPasswordReset = async (req, res) => {
+        const { password, password_confirmation, termAndCondition } = req.body
+        const { id, token } = req.params
+        const user = await UserModel.findById(id)
+        if (user) {
+            const new_secret = user._id + process.env.JWT_SECRET_KEY
+            try {
+                jwt.verify(token, new_secret)
+                if (password && password_confirmation && termAndCondition) {
+                    if (password !== password_confirmation) {
+                        res.status(400).send({ status: 400, message: "New Password and Confirm New Password doesn't match", rootCause : "Please fill proper data" })
+                    } else {
+                        const salt = await bcrypt.genSalt(10)
+                        const newHashPassword = await bcrypt.hash(password, salt)
+                        await UserModel.findByIdAndUpdate(user._id, { $set: { password: newHashPassword } })
+                        res.status(200).send({ status: 200, message: "Password Reset Successfully done.", data: "Login with new password" })
+                    }
+                } else {
+                    res.status(400).send({ status: 400, message: "All Fields are Required", rootCause : "Password Reset Failed" })
+                }
+            } catch (error) {
+                console.log(error)
+                res.status(400).send({ status: 400, message: "Invalid Token", rootCause: "Password reset Link expired" })
+            }
+        } else {
+            res.status(400).send({ status: 400, message: "Invalid User Id", rootCause : "User not exist" })
+        }
+    }
+    // ^---------------------------------------------------------------------------------------------------------
 
 }
 

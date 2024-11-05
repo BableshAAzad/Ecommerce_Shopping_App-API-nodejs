@@ -6,6 +6,10 @@ import userRoutes from './routes/userRoutes.js'
 // const userRoutes = require("./routes/userRoutes.js")
 import productRoutes from "./routes/productRoutes.js"
 import bodyParser from 'body-parser';
+import addressRoutes from "./routes/addressRoutes.js"
+import contactRoutes from "./routes/contactRoutes.js"
+import cartRoutes from "./routes/cartRoutes.js"
+import orderRoutes from "./routes/orderRoutes.js"
 
 //! invoke dotenv
 dotenv.config();
@@ -30,8 +34,10 @@ app.use(cors(corsOptions))
 //* Database Connection
 connectDB(DATABASE_URL, DATABASE_NAME)
 
-//& convert incoming data into JSON
-app.use(bodyParser.json())
+//& convert incoming data into JSON &  Middleware for parsing request bodies
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+
 
 //^ Middleware to catch JSON parsing errors
 app.use((err, req, res, next) => {
@@ -42,10 +48,20 @@ app.use((err, req, res, next) => {
     next();
 });
 
+//! General error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: "Internal Server Error" });
+});
 
 //~ Load Routes
 app.use("/api/v1", userRoutes)
 app.use("/api/v1", productRoutes)
+app.use("/api/v1", addressRoutes)
+app.use("/api/v1", contactRoutes)
+app.use("/api/v1", cartRoutes)
+app.use("/api/v1", orderRoutes)
+
 
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`)
