@@ -11,7 +11,7 @@ class AddressController {
                 if (_id === userId) {
                     req.body.userId = _id;
                     let countAddress = await AddressModel.countDocuments(); // Get total item count
-                    if (user.userRole === "SELLER" && countAddress <= 0 || user.userRole === "CUSTOMER" && countAddress <= 3) {
+                    if (user.userRole === "SELLER" && countAddress === 0 || user.userRole === "CUSTOMER" && countAddress <= 4) {
                         let address = new AddressModel(req.body)
                         address = await address.save()
                         resp.status(201).send({ status: 201, message: "Address added successfully", data: address });

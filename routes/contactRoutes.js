@@ -10,5 +10,6 @@ router.get("/addresses/:addressId/contacts", checkUserAuth)
 //& Protected Routes
 router.post("/addresses/:addressId/contacts", ContactController.addContact)
 router.get("/addresses/:addressId/addresses", ContactController.getContact)
+router.put("/addresses/:addressId/contacts/:contactId", ContactController.updateContact)
 
 export default router

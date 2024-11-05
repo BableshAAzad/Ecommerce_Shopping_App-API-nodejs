@@ -47,11 +47,11 @@ class CartController {
                         existingCartItem.selectedQuantity = selectedQuantity;
                         await existingCartItem.save();
 
-                        // Adjust the product stocks based on quantity difference
-                        await ProductModel.findByIdAndUpdate(
-                            product.productId,
-                            { $inc: { stocks: -quantityDifference } }
-                        );
+                        //! Adjust the product stocks based on quantity difference
+                        // await ProductModel.findByIdAndUpdate(
+                        //     product.productId,
+                        //     { $inc: { stocks: -quantityDifference } }
+                        // );
 
                         return resp.status(200).send({
                             status: 200,
@@ -74,12 +74,12 @@ class CartController {
                             product: product.productId,
                         });
 
-                        // Save the new cart item and update product stock
+                        //! Save the new cart item and update product stock
                         await cartItem.save();
-                        await ProductModel.findByIdAndUpdate(
-                            product.productId,
-                            { $inc: { stocks: -selectedQuantity } }
-                        );
+                        // await ProductModel.findByIdAndUpdate(
+                        //     product.productId,
+                        //     { $inc: { stocks: -selectedQuantity } }
+                        // );
 
                         resp.status(201).send({
                             status: 201,
@@ -178,12 +178,12 @@ class CartController {
             );
 
             if (cartItem) {
-                // Adjust the product stocks based on quantity difference
-                const updatedProduct = await ProductModel.findOneAndUpdate(
-                    { _id: cartItem.product },
-                    { $inc: { stocks: -quantityDifference } }, // Adjust stocks by quantity difference
-                    { new: true }
-                );
+                //! Adjust the product stocks based on quantity difference
+                // const updatedProduct = await ProductModel.findOneAndUpdate(
+                //     { _id: cartItem.product },
+                //     { $inc: { stocks: -quantityDifference } }, // Adjust stocks by quantity difference
+                //     { new: true }
+                // );
 
                 resp.status(200).send({
                     status: 200,
@@ -242,11 +242,11 @@ class CartController {
                 });
             }
 
-            // Restore the product stock based on the cart item quantity
-            await ProductModel.findByIdAndUpdate(
-                cartItem.product,
-                { $inc: { stocks: cartItem.selectedQuantity } }
-            );
+            //! Restore the product stock based on the cart item quantity
+            // await ProductModel.findByIdAndUpdate(
+            //     cartItem.product,
+            //     { $inc: { stocks: cartItem.selectedQuantity } }
+            // );
 
             // Delete the cart item
             await CartModel.deleteOne({ _id: cartProductId });
@@ -292,8 +292,8 @@ class CartController {
                 }
             }));
 
-            // Execute bulk update for stock adjustments
-            await ProductModel.bulkWrite(bulkProductUpdates);
+            //! Execute bulk update for stock adjustments
+            // await ProductModel.bulkWrite(bulkProductUpdates);
 
             // Delete all cart items for the user
             await CartModel.deleteMany({ userId });
