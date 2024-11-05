@@ -292,17 +292,9 @@ class ProductController {
     };
     // ^---------------------------------------------------------------------------------------------------------
     static productsDashboard = async (req, resp) => {
-        let sellerId = req.user.userId; // Assuming sellerId is available in req.user
+        let sellerId = req.user.userId;
+        const { period } = req.query; // Get the selected period from query parameters
         try {
-            // Get sales/stocks over time (for line chart), filtered by sellerId
-            const lineData = await ProductModel.aggregate([
-                { $match: { sellerId: new mongoose.Types.ObjectId(sellerId) } }, // Filter by sellerId
-                { $group: { _id: { $month: "$restockedAt" }, totalStocks: { $sum: "$stocks" } } },
-                { $sort: { "_id": 1 } } // Sort by month
-            ]);
-
-            // Map lineData for frontend
-            const formattedLineData = lineData.map(item => item.totalStocks);
 
             // Get product counts by category (for bar chart), filtered by sellerId
             const barData = await ProductModel.aggregate([
@@ -323,7 +315,43 @@ class ProductController {
                 const match = barData.find(item => item._id === type);
                 return match ? match.count : 0; // Assign 0 if type is not found
             });
+            // -------------------------------------------------------------------------------------------------
+            // Get sales data based on selected period
+            const groupByPeriod = {
+                "daily": { $dateToString: { format: "%Y-%m-%d", date: "$restockedAt" } },
+                "weekly": { $dateToString: { format: "%Y-%U", date: "$restockedAt" } },
+                "monthly": { $dateToString: { format: "%Y-%m", date: "$restockedAt" } },
+                "yearly": { $dateToString: { format: "%Y", date: "$restockedAt" } }
+            };
 
+            // Ensure to include current date if no sales
+            const today = new Date();
+            const formattedToday = today.toISOString().split('T')[0];
+
+            const dailySalesData = await ProductModel.aggregate([
+                { $match: { sellerId: new mongoose.Types.ObjectId(sellerId), restockedAt: { $exists: true } } },
+                {
+                    $group: {
+                        _id: groupByPeriod[period] || groupByPeriod['daily'],
+                        totalSales: { $sum: "$stocks" }
+                    }
+                },
+                { $sort: { _id: 1 } } // Sort by date
+            ]);
+
+            // If there's no data for today, push a default entry
+            const totalSalesToday = dailySalesData.find(entry => entry._id === formattedToday);
+            if (!totalSalesToday && period === 'daily') {
+                dailySalesData.push({ _id: formattedToday, totalSales: 0 });
+            }
+
+            // Format sales data for frontend
+            const lineChartData = dailySalesData.map(entry => ({
+                date: entry._id,
+                totalSales: entry.totalSales
+            }));
+
+            // --------------------------------------------------------------------------------------------------
             // Get product distribution by discount types (for pie chart), filtered by sellerId
             const pieData = await ProductModel.aggregate([
                 { $match: { sellerId: new mongoose.Types.ObjectId(sellerId) } }, // Filter by sellerId
@@ -334,13 +362,8 @@ class ProductController {
             const formattedPieData = pieData.map(item => item.count);
 
             // Send formatted data to frontend
-            console.log({
-                lineData: formattedLineData,
-                barData: formattedBarData,
-                pieData: formattedPieData,
-            })
             resp.status(200).send({
-                lineData: formattedLineData,
+                lineData: lineChartData,
                 barData: formattedBarData,
                 pieData: formattedPieData,
             });
